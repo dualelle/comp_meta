@@ -22,4 +22,4 @@ jobs:
       env:
         SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
         SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
-      run: python /scrt/user_trier.py
+      run: python scrt/user_trier.py
