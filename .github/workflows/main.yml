@@ -23,11 +23,3 @@ jobs:
         SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
         SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
       run: python /scrt/user_trier.py
-      # If this step exits with non-zero, workflow will fail
-    
-    - name: Upload artifact
-      if: success()
-      uses: actions/upload-artifact@v3
-      with:
-        name: report
-        path: raw_users_trier.xls
