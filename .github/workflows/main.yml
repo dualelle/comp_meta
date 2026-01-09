@@ -1,0 +1,33 @@
+name: Download Report
+on: [push, workflow_dispatch]
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium webdriver-manager
+    
+    - name: Download Report
+      env:
+        SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
+        SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
+      run: python /scrt/user_trier.py
+      # If this step exits with non-zero, workflow will fail
+    
+    - name: Upload artifact
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: report
+        path: raw_users_trier.xls
