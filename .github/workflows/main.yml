@@ -1,5 +1,6 @@
 name: Download Reports
-on: [push, workflow_dispatch]
+# on: [push, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   download:
@@ -24,14 +25,14 @@ jobs:
         SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
       run: python scrt/user_trier.py
 
-    - name: Download SCI Report
-      env:
-        SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
-        SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
-      run: python scrt/user_sci.py
+    #- name: Download SCI Report
+      #env:
+        #SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
+        #SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
+      #run: python scrt/user_sci.py
 
     - name: Update user_trier Worksheet
       env:
         GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
-        TARGET_SHEET_ID: ${{ secrets.TARGET_SHEET_ID }}
+        SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
       run: python scrt/proc/ready_user_trier.py
