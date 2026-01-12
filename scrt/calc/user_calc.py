@@ -60,7 +60,13 @@ class DataCombiner:
             data = worksheet.get_all_values()
             
             if len(data) <= 1:  # Only header or empty
-                raise GoogleSheetsError(f"Worksheet '{worksheet_name}' is empty or has no data")
+                logging.warning(f"Worksheet '{worksheet_name}' is empty or has only headers")
+                # Return empty DataFrame with headers if they exist
+                if len(data) == 1:
+                    df = pd.DataFrame(columns=data[0])
+                else:
+                    df = pd.DataFrame()
+                return df
             
             # Create DataFrame
             df = pd.DataFrame(data[1:], columns=data[0])
@@ -69,7 +75,7 @@ class DataCombiner:
             df.columns = df.columns.str.strip()
             
             logging.info(f"✓ Loaded {len(df)} rows from '{worksheet_name}'")
-            logging.info(f"  Columns: {list(df.columns)}")
+            logging.info(f"  Columns found: {list(df.columns)}")
             
             return df
             
@@ -78,180 +84,253 @@ class DataCombiner:
         except Exception as e:
             raise GoogleSheetsError(f"Failed to fetch data from '{worksheet_name}': {str(e)}")
     
-    def combine_data(self, sci_worksheet: str = "user_sci", trier_worksheet: str = "user_sci") -> pd.DataFrame:
-        """Combine data from SCI and Trier worksheets using CPF as key"""
+    def _clean_cpf(self, df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+        """Clean CPF column - remove non-numeric characters"""
+        # Find CPF column
+        cpf_columns = []
+        for col in df.columns:
+            if 'cpf' in col.lower():
+                cpf_columns.append(col)
+        
+        if not cpf_columns:
+            logging.warning(f"No CPF column found in {source_name}")
+            return df
+        
+        cpf_col = cpf_columns[0]
+        
+        # Clean CPF values
+        df[cpf_col] = df[cpf_col].astype(str).str.replace(r'\D', '', regex=True)
+        
+        # Rename to standard 'CPF' for merging
+        if cpf_col != 'CPF':
+            df = df.rename(columns={cpf_col: 'CPF'})
+            logging.info(f"  Renamed '{cpf_col}' to 'CPF' in {source_name}")
+        
+        return df
+    
+    def _find_and_rename_column(self, df: pd.DataFrame, search_terms: list, target_name: str, source_name: str) -> pd.DataFrame:
+        """Find a column by searching for terms and rename it to target name"""
+        for term in search_terms:
+            for col in df.columns:
+                if term.lower() in col.lower():
+                    if col != target_name:
+                        df = df.rename(columns={col: target_name})
+                        logging.info(f"  Found '{col}' as '{target_name}' in {source_name}")
+                    return df
+        logging.warning(f"  Could not find column matching {search_terms} in {source_name}")
+        return df
+    
+    def combine_data(self) -> pd.DataFrame:
+        """Combine data from user_sci and user_trier worksheets"""
         try:
-            logging.info("Starting data combination process...")
+            logging.info("=" * 50)
+            logging.info("STARTING DATA COMBINATION")
+            logging.info("=" * 50)
             
             # Get data from both worksheets
-            sci_df = self.get_sheet_data(sci_worksheet)
-            trier_df = self.get_sheet_data(trier_worksheet)
+            sci_df = self.get_sheet_data("user_sci")
+            trier_df = self.get_sheet_data("user_trier")
             
-            # Prepare SCI data
-            # Clean CPF column in SCI data (remove non-numeric characters)
-            if 'CPF' in sci_df.columns:
-                sci_df['CPF_clean'] = sci_df['CPF'].astype(str).str.replace(r'\D', '', regex=True)
-                sci_df = sci_df.drop(columns=['CPF']).rename(columns={'CPF_clean': 'CPF'})
-            else:
-                raise GoogleSheetsError("'CPF' column not found in SCI worksheet")
+            # Check if DataFrames are empty
+            if sci_df.empty:
+                logging.error("Worksheet 'user_sci' is empty or not found")
+                return pd.DataFrame(columns=['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual'])
             
-            # Prepare Trier data
-            # Clean CPF column in Trier data (remove non-numeric characters)
-            if 'CPF' in trier_df.columns:
-                trier_df['CPF_clean'] = trier_df['CPF'].astype(str).str.replace(r'\D', '', regex=True)
-                trier_df = trier_df.drop(columns=['CPF']).rename(columns={'CPF_clean': 'CPF'})
-            else:
-                # If Trier doesn't have CPF, check if it has another identifier
-                logging.warning("'CPF' column not found in Trier worksheet")
-                # If no CPF, we can't merge - create empty combined dataset
-                return self._create_empty_combined_df(sci_df, trier_df)
+            if trier_df.empty:
+                logging.error("Worksheet 'user_trier' is empty or not found")
+                return pd.DataFrame(columns=['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual'])
+            
+            logging.info("\n--- PREPARING SCI DATA ---")
+            # Clean and rename SCI columns according to specification
+            sci_df = self._clean_cpf(sci_df, "user_sci")
+            sci_df = self._find_and_rename_column(sci_df, ['filial'], 'Filial', "user_sci")
+            sci_df = self._find_and_rename_column(sci_df, ['cargo atual', 'cargo'], 'Cargo atual', "user_sci")
+            
+            # Keep only needed columns from SCI
+            sci_needed_cols = []
+            for col in ['Filial', 'CPF', 'Cargo atual']:
+                if col in sci_df.columns:
+                    sci_needed_cols.append(col)
+            
+            sci_df = sci_df[sci_needed_cols]
+            logging.info(f"  Final SCI columns: {list(sci_df.columns)}")
+            
+            logging.info("\n--- PREPARING TRIER DATA ---")
+            # Clean and rename Trier columns according to specification
+            trier_df = self._clean_cpf(trier_df, "user_trier")
+            trier_df = self._find_and_rename_column(trier_df, ['código', 'codigo'], 'Código', "user_trier")
+            trier_df = self._find_and_rename_column(trier_df, ['funcionário', 'funcionario', 'nome'], 'Funcionário', "user_trier")
+            
+            # Keep only needed columns from Trier
+            trier_needed_cols = []
+            for col in ['Código', 'CPF', 'Funcionário']:
+                if col in trier_df.columns:
+                    trier_needed_cols.append(col)
+            
+            trier_df = trier_df[trier_needed_cols]
+            logging.info(f"  Final Trier columns: {list(trier_df.columns)}")
+            
+            # Validate required columns are present
+            required_sci_cols = ['Filial', 'CPF', 'Cargo atual']
+            required_trier_cols = ['Código', 'CPF', 'Funcionário']
+            
+            missing_sci = [col for col in required_sci_cols if col not in sci_df.columns]
+            missing_trier = [col for col in required_trier_cols if col not in trier_df.columns]
+            
+            if missing_sci:
+                logging.error(f"Missing required columns in user_sci: {missing_sci}")
+                return pd.DataFrame(columns=['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual'])
+            
+            if missing_trier:
+                logging.error(f"Missing required columns in user_trier: {missing_trier}")
+                return pd.DataFrame(columns=['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual'])
             
             # Filter out empty CPF values
-            sci_df = sci_df[sci_df['CPF'].str.strip() != '']
-            trier_df = trier_df[trier_df['CPF'].str.strip() != '']
+            sci_df = sci_df[sci_df['CPF'].astype(str).str.strip() != '']
+            trier_df = trier_df[trier_df['CPF'].astype(str).str.strip() != '']
             
-            # Ensure CPF is string for merging
+            # Ensure CPF is string
             sci_df['CPF'] = sci_df['CPF'].astype(str)
             trier_df['CPF'] = trier_df['CPF'].astype(str)
             
-            # Log CPF overlap
+            # Log statistics
             sci_cpfs = set(sci_df['CPF'])
             trier_cpfs = set(trier_df['CPF'])
             common_cpfs = sci_cpfs.intersection(trier_cpfs)
             
-            logging.info(f"Unique CPFs in SCI: {len(sci_cpfs)}")
-            logging.info(f"Unique CPFs in Trier: {len(trier_cpfs)}")
-            logging.info(f"Common CPFs (will be merged): {len(common_cpfs)}")
+            logging.info("\n--- CPF MATCHING STATISTICS ---")
+            logging.info(f"  Unique CPFs in user_sci: {len(sci_cpfs)}")
+            logging.info(f"  Unique CPFs in user_trier: {len(trier_cpfs)}")
+            logging.info(f"  Common CPFs (will be merged): {len(common_cpfs)}")
             
-            # Merge data on CPF
+            if not common_cpfs:
+                logging.error("No common CPFs found between worksheets!")
+                logging.info("Sample CPFs from user_sci (first 5):")
+                if len(sci_cpfs) > 0:
+                    logging.info(f"  {list(sci_cpfs)[:5]}")
+                logging.info("Sample CPFs from user_trier (first 5):")
+                if len(trier_cpfs) > 0:
+                    logging.info(f"  {list(trier_cpfs)[:5]}")
+                return pd.DataFrame(columns=['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual'])
+            
+            logging.info("\n--- MERGING DATA ---")
+            # Merge on CPF (inner join - only matching CPFs)
             merged_df = pd.merge(
                 sci_df,
                 trier_df,
                 on='CPF',
-                how='inner',  # Only keep rows with matching CPF in both datasets
-                suffixes=('_sci', '_trier')
+                how='inner'
             )
             
-            if merged_df.empty:
-                logging.warning("No matching CPFs found between datasets")
-                # Return empty combined dataset with correct structure
-                return self._create_empty_combined_df(sci_df, trier_df)
+            logging.info(f"  Rows after merge: {len(merged_df)}")
             
-            # Rename and select columns for final output
-            # Map columns to desired output format
-            column_mapping = {}
-            
-            # Determine Filial source (prefer SCI if available)
-            if 'Filial_sci' in merged_df.columns:
-                column_mapping['Filial'] = 'Filial_sci'
-            elif 'Filial_trier' in merged_df.columns:
-                column_mapping['Filial'] = 'Filial_trier'
-            
-            # Determine Nome source (prefer SCI if available)
-            if 'Nome_sci' in merged_df.columns:
-                column_mapping['Nome'] = 'Nome_sci'
-            elif 'Nome_trier' in merged_df.columns:
-                column_mapping['Nome'] = 'Nome_trier'
-            elif 'Funcionário_sci' in merged_df.columns:  # Alternative column name
-                column_mapping['Nome'] = 'Funcionário_sci'
-            elif 'Funcionário_trier' in merged_df.columns:  # Alternative column name
-                column_mapping['Nome'] = 'Funcionário_trier'
-            
-            # Determine Cargo atual source (prefer SCI if available)
-            if 'Cargo atual_sci' in merged_df.columns:
-                column_mapping['Cargo atual'] = 'Cargo atual_sci'
-            elif 'Cargo atual_trier' in merged_df.columns:
-                column_mapping['Cargo atual'] = 'Cargo atual_trier'
-            
-            # Determine Código source (from Trier)
-            if 'Código_trier' in merged_df.columns:
-                column_mapping['Código'] = 'Código_trier'
-            elif 'Código_sci' in merged_df.columns:
-                column_mapping['Código'] = 'Código_sci'
-            
-            # Keep CPF
-            column_mapping['CPF'] = 'CPF'
-            
-            # Create final DataFrame with desired column order
-            desired_columns = ['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual']
+            # Create final DataFrame according to specification
+            logging.info("\n--- CREATING FINAL DATAFRAME ---")
             final_df = pd.DataFrame()
             
-            for col in desired_columns:
-                if col in column_mapping and column_mapping[col] in merged_df.columns:
-                    final_df[col] = merged_df[column_mapping[col]]
-                else:
-                    final_df[col] = None  # Empty column if not found
-                    logging.warning(f"Column '{col}' not found in merged data")
+            # 1. Filial from user_sci
+            final_df['Filial'] = merged_df['Filial']
+            logging.info(f"  ✓ Filial: Copied from user_sci")
             
-            # Clean and format the data
-            # Remove duplicates based on CPF
-            final_df = final_df.drop_duplicates(subset=['CPF'])
+            # 2. Código from user_trier
+            final_df['Código'] = merged_df['Código']
+            logging.info(f"  ✓ Código: Copied from user_trier")
             
-            # Sort by Filial, then Código
-            if 'Filial' in final_df.columns and 'Código' in final_df.columns:
+            # 3. CPF from either (using from merged, which is common)
+            final_df['CPF'] = merged_df['CPF']
+            logging.info(f"  ✓ CPF: From merged data (common CPFs)")
+            
+            # 4. Nome from user_trier (Funcionário column renamed to Nome)
+            final_df['Nome'] = merged_df['Funcionário']
+            logging.info(f"  ✓ Nome: Copied from user_trier (Funcionário column)")
+            
+            # 5. Cargo atual from user_sci
+            final_df['Cargo atual'] = merged_df['Cargo atual']
+            logging.info(f"  ✓ Cargo atual: Copied from user_sci")
+            
+            # Clean up: remove any rows with empty essential values
+            rows_before = len(final_df)
+            final_df = final_df[
+                final_df['Filial'].notna() & 
+                final_df['Código'].notna() & 
+                final_df['CPF'].notna() &
+                (final_df['CPF'].astype(str).str.strip() != '')
+            ]
+            rows_after = len(final_df)
+            
+            if rows_before != rows_after:
+                logging.info(f"  Removed {rows_before - rows_after} rows with missing essential values")
+            
+            # Sort by Filial (numeric), then Código
+            if not final_df.empty:
                 # Convert to numeric for proper sorting
                 final_df['Filial_numeric'] = pd.to_numeric(final_df['Filial'], errors='coerce')
                 final_df['Código_numeric'] = pd.to_numeric(final_df['Código'], errors='coerce')
+                
+                # Sort
                 final_df = final_df.sort_values(['Filial_numeric', 'Código_numeric'])
+                
+                # Remove temporary columns
                 final_df = final_df.drop(columns=['Filial_numeric', 'Código_numeric'])
+                
+                # Reset index
+                final_df = final_df.reset_index(drop=True)
             
-            # Reset index
-            final_df = final_df.reset_index(drop=True)
-            
-            logging.info(f"✓ Successfully combined data. Final rows: {len(final_df)}")
-            logging.info(f"✓ Final columns: {list(final_df.columns)}")
+            logging.info(f"\n✓ Final DataFrame created with {len(final_df)} rows")
+            logging.info(f"✓ Columns: {list(final_df.columns)}")
             
             return final_df
             
         except Exception as e:
             raise GoogleSheetsError(f"Failed to combine data: {str(e)}")
     
-    def _create_empty_combined_df(self, sci_df: pd.DataFrame, trier_df: pd.DataFrame) -> pd.DataFrame:
-        """Create empty combined DataFrame with correct structure when no merge is possible"""
-        desired_columns = ['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual']
-        empty_df = pd.DataFrame(columns=desired_columns)
-        logging.warning("Created empty combined DataFrame (no CPF matches found)")
-        return empty_df
-    
-    def create_or_update_worksheet(self, df: pd.DataFrame, worksheet_name: str = "filtered_user"):
-        """Create or update worksheet with combined data"""
-        if df.empty:
-            logging.warning(f"DataFrame is empty. Creating empty worksheet '{worksheet_name}'")
-        
+    def create_filtered_worksheet(self, df: pd.DataFrame):
+        """Create or update filtered_user worksheet with combined data"""
         try:
+            worksheet_name = "filtered_user"
+            
+            logging.info(f"\n--- CREATING WORKSHEET: {worksheet_name} ---")
+            
             # Get spreadsheet
             spreadsheet = self.client.open_by_key(self.sheet_id)
             
             # Check if worksheet already exists
             try:
                 worksheet = spreadsheet.worksheet(worksheet_name)
-                logging.info(f"Worksheet '{worksheet_name}' already exists. Updating...")
+                logging.info(f"  Worksheet '{worksheet_name}' already exists. Updating...")
             except gspread.exceptions.WorksheetNotFound:
                 # Create new worksheet
-                logging.info(f"Creating new worksheet: {worksheet_name}")
+                logging.info(f"  Creating new worksheet: '{worksheet_name}'")
                 worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=10)
             
             # Clear existing data
             worksheet.clear()
             
-            # Prepare data for upload
-            # Ensure all columns are present (add missing ones as empty)
-            desired_columns = ['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual']
-            for col in desired_columns:
-                if col not in df.columns:
-                    df[col] = None
+            if df.empty:
+                logging.warning(f"  DataFrame is empty. Creating worksheet with headers only.")
+                headers = ['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual']
+                worksheet.update([headers])
+                logging.info(f"  ✓ Created empty worksheet '{worksheet_name}' with headers")
+                return
             
-            # Reorder columns
-            df = df[desired_columns]
+            # Ensure all required columns are present
+            required_columns = ['Filial', 'Código', 'CPF', 'Nome', 'Cargo atual']
+            for col in required_columns:
+                if col not in df.columns:
+                    df[col] = ''
+                    logging.warning(f"  Added missing column: {col}")
+            
+            # Reorder columns to match specification
+            df = df[required_columns]
             
             # Fill NaN with empty strings
             df = df.fillna('')
             
-            # Convert to list of lists
+            # Convert to list of lists for Google Sheets
             values = [df.columns.tolist()] + df.values.tolist()
             
-            # Upload data
-            logging.info(f"Uploading {len(df)} rows to worksheet '{worksheet_name}'...")
+            # Upload to Google Sheets
+            logging.info(f"  Uploading {len(df)} rows to '{worksheet_name}'...")
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.sheet_id,
                 range=worksheet_name,
@@ -259,10 +338,11 @@ class DataCombiner:
                 body={"values": values}
             ).execute()
             
-            logging.info(f"✓ Worksheet '{worksheet_name}' updated successfully")
+            logging.info(f"  ✓ Successfully updated '{worksheet_name}' with {len(df)} rows")
             
         except Exception as e:
             raise GoogleSheetsError(f"Failed to create/update worksheet: {str(e)}")
+
 
 def main():
     """Main execution with proper error handling for GitHub Actions"""
@@ -278,38 +358,46 @@ def main():
             raise GoogleSheetsError("GSA_CREDENTIALS environment variable not set")
         
         logging.info("Environment variables loaded successfully")
+        logging.info(f"Sheet ID: {sheet_id}")
         
         # Initialize and authenticate
         combiner = DataCombiner(gsa_credentials, sheet_id)
         combiner.authenticate()
         
-        # Combine data from worksheets
-        combined_df = combiner.combine_data(
-            sci_worksheet="user_sci",
-            trier_worksheet="user_sci"
-        )
+        # Combine data from worksheets according to specification
+        combined_df = combiner.combine_data()
         
-        # Show preview
-        logging.info("\n=== COMBINED DATA PREVIEW ===")
-        logging.info(f"Total rows: {len(combined_df)}")
         if not combined_df.empty:
-            logging.info("\nFirst 5 rows:")
-            logging.info(combined_df.head().to_string())
+            logging.info(f"Total rows: {len(combined_df)}")
+            logging.info("\nFirst 10 rows:")
+            logging.info(combined_df.head(10).to_string(index=False))
+            
+            # Show column summary
+            logging.info("\nColumn Summary:")
+            for col in combined_df.columns:
+                non_null = combined_df[col].notna().sum()
+                unique = combined_df[col].nunique()
+                sample = combined_df[col].iloc[0] if non_null > 0 else "N/A"
+                logging.info(f"  {col}: {non_null} non-null, {unique} unique, sample: {sample}")
         else:
-            logging.info("No data to preview (empty DataFrame)")
+            logging.warning("No data combined (empty DataFrame)")
         
-        # Create or update filtered worksheet
-        combiner.create_or_update_worksheet(combined_df, "filtered_user")
+        # Create filtered_user worksheet
+        combiner.create_filtered_worksheet(combined_df)
         
-        logging.info("✓ Process completed successfully")
+        logging.info("\n" + "=" * 50)
+        logging.info("✓ PROCESS COMPLETED SUCCESSFULLY")
+        logging.info("=" * 50)
+        
         return 0  # Success exit code
         
     except GoogleSheetsError as e:
-        logging.error(f"✗ {e.__class__.__name__}: {str(e)}")
+        logging.error(f"\n✗ ERROR: {e.__class__.__name__}: {str(e)}")
         return 1  # Business logic failure
     except Exception as e:
-        logging.error(f"✗ Unexpected error: {str(e)}")
+        logging.error(f"\n✗ UNEXPECTED ERROR: {str(e)}")
         return 2  # Unexpected failure
+
 
 if __name__ == "__main__":
     # Exit with proper code for GitHub Actions
