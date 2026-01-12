@@ -25,14 +25,20 @@ jobs:
         SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
       run: python scrt/user_trier.py
 
-    #- name: Download SCI Report
-      #env:
-        #SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
-        #SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
-      #run: python scrt/user_sci.py
+    - name: Download SCI Report
+      env:
+        SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
+        SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
+      run: python scrt/user_sci.py
 
     - name: Update user_trier Worksheet
       env:
         GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
         SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
       run: python scrt/proc/ready_user_trier.py
+
+    - name: Update user_trier Worksheet
+      env:
+        GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
+        SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
+      run: python scrt/proc/ready_user_sci.py
