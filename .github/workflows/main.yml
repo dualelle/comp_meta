@@ -29,3 +29,9 @@ jobs:
         SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
         SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
       run: python scrt/user_sci.py
+
+    - name: Update user_trier Worksheet
+      env:
+        GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
+        TARGET_SHEET_ID: ${{ secrets.TARGET_SHEET_ID }}
+      run: python scrt/proc/ready_user_trier.py
