@@ -19,11 +19,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager pandas openpyxl xlrd gspread google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client packaging
     
-    - name: Download Trier Report
-      env:
-        SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
-        SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
-      run: python scrt/user_trier.py
+    #- name: Download Trier Report
+      #env:
+        #SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
+        #SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
+      #run: python scrt/user_trier.py
 
     - name: Download SCI Report
       env:
@@ -31,13 +31,13 @@ jobs:
         SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
       run: python scrt/user_sci.py
 
-    - name: Update user_trier Worksheet
-      env:
-        GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
-        SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
-      run: python scrt/proc/ready_user_trier.py
+    #- name: Update user_trier Worksheet
+      #env:
+        #GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
+        #SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
+      #run: python scrt/proc/ready_user_trier.py
 
-    - name: Update user_trier Worksheet
+    - name: Update user_sci Worksheet
       env:
         GSA_CREDENTIALS: ${{ secrets.CRAPPY_CREDENTIALS }}
         SOURCE_SHEET_ID: ${{ secrets.SOURCE_SHEET_ID }}
