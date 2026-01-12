@@ -1,4 +1,4 @@
-name: Download Report
+name: Download Reports
 on: [push, workflow_dispatch]
 
 jobs:
@@ -18,8 +18,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager
     
-    - name: Download Report
+    - name: Download Trier Report
       env:
         SGF_USERNAME: ${{ secrets.SGF_USERNAME }}
         SGF_PASSWORD: ${{ secrets.SGF_PASSWORD }}
       run: python scrt/user_trier.py
+
+    - name: Download SCI Report
+      env:
+        SCI_USERNAME: ${{ secrets.SCI_USERNAME }}
+        SCI_PASSWORD: ${{ secrets.SCI_PASSWORD }}
+      run: python scrt/user_sci.py
