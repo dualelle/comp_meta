@@ -273,8 +273,6 @@ def main():
         logging.info("\n=== DATA PREVIEW ===")
         logging.info(f"Total rows: {len(merged_df)}")
         logging.info(f"Columns: {list(merged_df.columns)}")
-        logging.info("\nFirst 5 rows:")
-        logging.info(merged_df.head().to_string())
         
         # Upload to Google Sheets
         sheets_uploader = GoogleSheetsUploader(gsa_credentials, sheet_id)
