@@ -227,14 +227,14 @@ def main():
     try:
         # Get environment variables
         gsa_credentials = os.getenv("GSA_CREDENTIALS")
-        sheet_id = os.getenv("TARGET_SHEET_ID")
+        sheet_id = os.getenv("SOURCE_SHEET_ID")
         download_dir = os.getenv("DOWNLOAD_DIR", "/home/runner/work/comp_meta/comp_meta/")
         
         # Validate environment variables
         if not gsa_credentials:
             raise GoogleSheetsError("GSA_CREDENTIALS environment variable not set")
         if not sheet_id:
-            raise GoogleSheetsError("TARGET_SHEET_ID environment variable not set")
+            raise GoogleSheetsError("SOURCE_SHEET_ID environment variable not set")
         
         logging.info("Environment variables loaded successfully")
         logging.info(f"Download directory: {download_dir}")
