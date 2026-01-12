@@ -247,7 +247,7 @@ def main():
         # Update Google Sheets
         sheets_updater = GoogleSheetsUpdater(gsa_credentials, sheet_id)
         sheets_updater.authenticate()
-        sheets_updater.update_sheet(processed_df, worksheet_name="users_trier")
+        sheets_updater.update_sheet(processed_df, worksheet_name="user_trier")
         
         logging.info("✓ Process completed successfully")
         return 0  # Success exit code
