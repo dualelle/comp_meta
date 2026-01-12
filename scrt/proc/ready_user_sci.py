@@ -149,7 +149,7 @@ class SCICSVProcessor:
             merged["Filial"] = pd.to_numeric(merged["Filial"], errors='coerce')
         
         # Verify we have the required columns
-        required_columns = ["Filial", "Nome", "Cargo atual"]
+        required_columns = ["Filial", "CPF", "Nome", "Cargo atual"]
         missing_columns = [col for col in required_columns if col not in merged.columns]
         
         if missing_columns:
@@ -196,7 +196,7 @@ class GoogleSheetsUploader:
             raise GoogleSheetsError("DataFrame is empty. Nothing to upload")
         
         # Select and validate required columns (original implementation)
-        desired_columns = ["Filial", "CPF" "Nome", "Cargo atual"]
+        desired_columns = ["Filial", "CPF", "Nome", "Cargo atual"]
         missing_columns = [col for col in desired_columns if col not in df.columns]
         
         if missing_columns:
