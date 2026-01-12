@@ -16,7 +16,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install selenium webdriver-manager
+        pip install selenium webdriver-manager pandas openpyxl xlrd gspread google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client packaging
     
     - name: Download Trier Report
       env:
