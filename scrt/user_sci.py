@@ -415,11 +415,11 @@ def main():
     """Entry point with proper exit codes for GitHub Actions"""
     try:
         # Get credentials from environment
-        usuario = os.getenv("SCI_USER")
+        usuario = os.getenv("SCI_USERNAME")
         senha = os.getenv("SCI_PASSWORD")
         
         if not usuario:
-            raise SCIDownloadError("SCI_USER environment variable not set")
+            raise SCIDownloadError("SCI_USERNAME environment variable not set")
         if not senha:
             raise SCIDownloadError("SCI_PASSWORD environment variable not set")
         
