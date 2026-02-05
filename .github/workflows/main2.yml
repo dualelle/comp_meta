@@ -1,4 +1,4 @@
-name: Download Reports
+name: Download Reports 2
 # on: [push, workflow_dispatch]
 on: [workflow_dispatch]
 
