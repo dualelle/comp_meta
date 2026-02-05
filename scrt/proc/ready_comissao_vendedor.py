@@ -124,8 +124,8 @@ class ComissaoProcessor:
             if result_df.empty:
                 raise ComissaoProcessingError("No valid employee rows found after processing")
             
-            # Format Filial column (2-digit with leading zeros)
-            result_df["Filial"] = result_df["Filial"].astype(int).astype(str).str.zfill(2)
+            # Format Filial column as integer (no leading zeros) - CHANGED HERE
+            result_df["Filial"] = result_df["Filial"].astype(int).astype(str)
             
             # Reorder columns
             result_df = result_df[[
@@ -144,8 +144,7 @@ class ComissaoProcessor:
             raise ComissaoProcessingError("Excel file is empty or corrupted")
         except Exception as e:
             raise ComissaoProcessingError(f"Failed to process Excel file: {str(e)}")
-
-
+            
 class ComissaoSheetsUploader:
     def __init__(self, credentials_json: str, sheet_id: str):
         if not credentials_json:
